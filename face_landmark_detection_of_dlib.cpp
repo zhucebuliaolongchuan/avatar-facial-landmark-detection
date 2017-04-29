@@ -207,17 +207,6 @@ int main(int argc, char** argv) {
                     std::swap(prevgray, gray);
                     }
                 }
-            // if (calDistanceDiff(prevTrackPts, nextTrackPts) > 1.0) {
-            //     if (shapes.size() == 1) {
-            //         const full_object_detection& d = shapes[0];
-            //         for (int i = 0; i < d.num_parts(); i++) {
-            //             prevTrackPts[i].x = d.part(i).x();
-            //             prevTrackPts[i].y = d.part(i).y();
-            //         }
-            //     }
-            // } else {
-
-            // }
 
             // Optical Flow Detection
             // cvtColor(frame, gray, CV_BGR2GRAY);
