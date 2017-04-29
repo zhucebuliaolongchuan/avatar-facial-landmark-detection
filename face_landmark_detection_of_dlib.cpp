@@ -183,44 +183,6 @@ int main(int argc, char** argv) {
                 flag = 1; 
             }
 
-            // Use Optical Flow to track the facial landmark when the variance beteen last track-points and current track-points is lower than 1.0, otherwise use 
-            // if (shapes.size() == 1) {
-            //     const full_object_detection& d = shapes[0];
-            //     if (calDistanceDiff(prevTrackPts, nextTrackPts) > 2) {
-            //         for (int i = 0; i < d.num_parts(); i++) {
-            //             cv::circle(frame, cv::Point2f(d.part(i).x(), d.part(i).y()), 2, cv::Scalar(0, 255, 255), -1);
-            //             prevTrackPts[i] = cv::Point2f(d.part(i).x(), d.part(i).y());
-            //             // If we use dlib to detect the facial landmark, we also need to predict the next point via OF so that we can get the nextTrackPoints
-            //             cvtColor(frame, gray, CV_BGR2GRAY);
-            //             std::vector<uchar> status;
-            //             std::vector<float> err;
-            //             calcOpticalFlowPyrLK(prevgray, gray, prevTrackPts, nextTrackPts, status, err);
-            //             std::swap(prevTrackPts, nextTrackPts);
-            //             std::swap(prevgray, gray);
-            //         }
-            //     } else {
-            //         // Optical Flow Detection
-            //         for (int i = 0; i < d.num_parts(); i++) {
-            //             prevTrackPts[i].x = d.part(i).x();
-            //             prevTrackPts[i].y = d.part(i).y();
-            //         }
-            //         cvtColor(frame, gray, CV_BGR2GRAY);
-            //         if (prevgray.data && !prevTrackPts.empty()) {
-            //             std::vector<uchar> status;
-            //             std::vector<float> err;
-            //             calcOpticalFlowPyrLK(prevgray, gray, prevTrackPts, nextTrackPts, status, err);
-            //             // cvtColor(prevgray, cflow, CV_GRAY2RGB);
-            //             for (int i = 0; i < nextTrackPts.size(); i++) {
-            //                 cv::circle(frame, nextTrackPts[i], 2, cv::Scalar(0, 0, 255), -1);
-            //             }
-            //             std::swap(prevTrackPts, nextTrackPts);
-            //             std::swap(prevgray, gray);
-            //             // prevTrackPts = nextTrackPts;
-            //             // prevgray = gray;
-            //         }
-            //     }
-            // }
-
             if (shapes.size() == 1) {
                 cvtColor(frame, gray, CV_BGR2GRAY);
                 if (prevgray.data) {
