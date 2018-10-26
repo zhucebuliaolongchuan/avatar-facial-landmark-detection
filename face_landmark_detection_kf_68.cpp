@@ -1,7 +1,6 @@
-/**
- * Detect 68 face landmarks in images read from a webcam and draw points.
+/* 
+landmarks in images read from a webcam and points that drew by the program.
  */
-
 #include <dlib/opencv.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
@@ -22,84 +21,7 @@ void print_usage() {
     std::cout << "./face_landmark_detection [path/to/shape_predictor_68_face_landmarks.dat]" << std::endl;
 }
 
-// cv::Point2i kalman_setup(cv::Point lastPoint, cv::Point curPoint) {
-// 	// 1. Kalman Setup
-// 	const int stateNum = 4;
-// 	const int measureNum = 2;
-
-// 	KalmanFilter KF(stateNum, measureNum, 0);
-// 	Mat state(stateNum, 1, CV_32FC1);
-// 	Mat processNoise(stateNum, 1, CV_32F);
-// 	Mat measurement = Mat::zeros(measureNum, 1, CV_32F);
-
-// 	// Generate a matrix randomly
-// 	randn(state, Scalar::all(0), Scalar::all(0.1));
-// 	KF.transitionMatrix = *(Mat_<float>(4, 4) <<   
-// 			1,0,1,0,
-// 			0,1,0,1,   
-//  	        0,0,1,0,   
-// 			0,0,0,1 );  
-// 	//!< measurement matrix (H) 观测模型  
-// 	setIdentity(KF.measurementMatrix);  
-  
-// 	//!< process noise covariance matrix (Q)  
-// 	setIdentity(KF.processNoiseCov, Scalar::all(1e-5));  
-          
-// 	//!< measurement noise covariance matrix (R)  
-// 	setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
-
-// 	//!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
-// 	setIdentity(KF.errorCovPost, Scalar::all(1));
-	
-// 	randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
-
-//     for (;;) {
-//         // Kalman Prediction
-//         Mat prediction = KF.predict();
-//         cv::Point2i predict_point = cv::Point2i((int)prediction.at<float>(0), (int)prediction.at<float>(1));
-
-//         // Update Measurement
-//         measurement.at<float>(0) = (float)curPoint.x;
-//         measurement.at<float>(0) = (float)curPoint.y;
-
-//         // Correct Measurement
-//         KF.correct(measurement);
-//     }
-// }
-
-void kalman_filter_setup() {
-        // Kalman Filter Setup (One Pont Test)
-        const int stateNum = 4;
-        const int measureNum = 2;
-
-        KalmanFilter KF(stateNum, measureNum, 0);
-        Mat state(stateNum, 1, CV_32FC1);
-        Mat processNoise(stateNum, 1, CV_32F);
-        Mat measurement = Mat::zeros(measureNum, 1, CV_32F);
-
-        // Generate a matrix randomly
-        randn(state, Scalar::all(0), Scalar::all(0.1));
-        KF.transitionMatrix = *(Mat_<float>(4, 4) <<   
-                                1,0,1,0,
-                                0,1,0,1,   
-                                0,0,1,0,   
-                                0,0,0,1 );
-
-        //!< measurement matrix (H) 观测模型  
-        setIdentity(KF.measurementMatrix);  
-  
-        //!< process noise covariance matrix (Q)  
-        setIdentity(KF.processNoiseCov, Scalar::all(1e-5));  
-          
-        //!< measurement noise covariance matrix (R)  
-        setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
-
-        //!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
-        setIdentity(KF.errorCovPost, Scalar::all(1));
-    
-        randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
-}
-
+// example usage for the 68-points kalmat filter (all the points from dlib)
 int main(int argc, char** argv) {
     try {
         if (argc > 2) {
@@ -110,6 +32,7 @@ int main(int argc, char** argv) {
         std::cout << "Press q to exit." << std::endl;
 
         cv::VideoCapture cap(0);
+
         if (!cap.isOpened()) {
             std::cerr << "Unable to connect to camera" << std::endl;
             return 1;
@@ -125,20 +48,29 @@ int main(int argc, char** argv) {
             deserialize("../../data/shape_predictor_68_face_landmarks.dat") >> pose_model;
         }
 
+        // Initialize the points of last frame
         std::vector<cv::Point2f> last_object;
         for (int i = 0; i < 68; ++i) {
-            last_object.push_back(cv::Point2i(0.0, 0.0));
+            last_object.push_back(cv::Point2f(0.0, 0.0));
         }
 
         double scaling = 0.5;
         int flag = -1;
-        cv::Point2f curPoint(0.0, 0.0);
 
-        // kalman_filter_setup();
+        // Initialize measurement points
+        std::vector<cv::Point2f> kalman_points;
+        for (int i = 0; i < 68; i++) {
+            kalman_points.push_back(cv::Point2f(0.0, 0.0));
+        }
+        // Initialize prediction points
+        std::vector<cv::Point2f> predict_points;
+        for (int i = 0; i < 68; i++) {
+            predict_points.push_back(cv::Point2f(0.0, 0.0));
+        }
 
-        // Kalman Filter Setup (One Pont Test)
-        const int stateNum = 4;
-        const int measureNum = 2;
+        // Kalman Filter Setup (68 Points Test)
+        const int stateNum = 272;
+        const int measureNum = 136;
 
         KalmanFilter KF(stateNum, measureNum, 0);
         Mat state(stateNum, 1, CV_32FC1);
@@ -146,14 +78,21 @@ int main(int argc, char** argv) {
         Mat measurement = Mat::zeros(measureNum, 1, CV_32F);
 
         // Generate a matrix randomly
-        randn(state, Scalar::all(0), Scalar::all(0.1));
-        KF.transitionMatrix = *(Mat_<float>(4, 4) <<   
-                                1,0,1,0,
-                                0,1,0,1,   
-                                0,0,1,0,   
-                                0,0,0,1 );
+        randn(state, Scalar::all(0), Scalar::all(0.0));
 
-        //!< measurement matrix (H) 观测模型  
+        // Generate the Measurement Matrix
+        KF.transitionMatrix = Mat::zeros(272, 272, CV_32F);
+        for (int i = 0; i < 272; i++) {
+            for (int j = 0; j < 272; j++) {
+                if (i == j || (j - 136) == i) {
+                    KF.transitionMatrix.at<float>(i, j) = 1.0;
+                } else {
+                    KF.transitionMatrix.at<float>(i, j) = 0.0;
+                }   
+            }
+        }
+
+        //!< measurement matrix (H) Measurement Model  
         setIdentity(KF.measurementMatrix);
   
         //!< process noise covariance matrix (Q)  
@@ -177,7 +116,7 @@ int main(int argc, char** argv) {
             cv::Mat tmp;
             cv::resize(raw, tmp, cv::Size(), scaling, scaling);
 
-            //Flip
+            // Flip
             cv::Mat temp;
             cv::flip(tmp, temp, 1);
 
@@ -202,7 +141,8 @@ int main(int argc, char** argv) {
             cv::Mat face = temp.clone();
             // We strict to detecting one face
             cv::Mat face_2 = temp.clone();
-            
+            cv::Mat face_3 = temp.clone();
+
             // Simple Filter
             if (shapes.size() == 1) {
                 const full_object_detection& d = shapes[0];
@@ -227,41 +167,46 @@ int main(int argc, char** argv) {
             // No Filter
             if (shapes.size() == 1) {
                 const full_object_detection& d = shapes[0];
-                curPoint.x = d.part(20).x();
-                curPoint.y = d.part(20).y();
                 for (int i = 0; i < d.num_parts(); i++) {
                     cv::circle(face_2, cv::Point2f(int(d.part(i).x()), int(d.part(i).y())), 2, cv::Scalar(0, 255, 255), -1);
                     std::cout << i << ": " << d.part(i) << std::endl;
                 }
+                for (int i = 0; i < d.num_parts(); i++) {
+                    kalman_points[i].x = d.part(i).x();
+                    kalman_points[i].y = d.part(i).y();
+                }
             }
 
-            // One Point Kalman Filter
-            cv::Point2f statePt = cv::Point2f(KF.statePost.at<float>(0), KF.statePost.at<float>(1));
             // Kalman Prediction
             Mat prediction = KF.predict();
-            cv::Point2f predict_point = cv::Point2f(prediction.at<float>(0), prediction.at<float>(1));
+            for (int i = 0; i < 68; i++) {
+                predict_points[i].x = prediction.at<float>(i * 2);
+                predict_points[i].y = prediction.at<float>(i * 2 + 1);
+            }
 
             // Update Measurement
-            measurement.at<float>(0) = (float)curPoint.x;
-            measurement.at<float>(1) = (float)curPoint.y;
+            for (int i = 0; i < 136; i++) {
+                if (i % 2 == 0) {
+                    measurement.at<float>(i) = (float)kalman_points[i / 2].x;
+                } else {
+                    measurement.at<float>(i) = (float)kalman_points[(i - 1) / 2].y;
+                }
+            }
 
             measurement += KF.measurementMatrix * state;
 
             // Correct Measurement
             KF.correct(measurement);
 
-            //randn(processNoise, Scalar(0), Scalar::all(sqrt(KF.processNoiseCov.at<float>(0, 0))));
-            //state = KF.transitionMatrix*state + processNoise;
-
-            // Show the one-point kalman filter
-            cv::circle(face, predict_point, 2, cv::Scalar(255, 0, 0), -1);
-            cv::circle(face_2, predict_point, 2, cv::Scalar(255, 0, 0), -1);
-            //std::cout << predict_point << std::endl;
-
+            // Show 68-points utilizing kalman filter
+            for (int i = 0; i < 68; i++) {
+                cv::circle(face_3, predict_points[i], 2, cv::Scalar(255, 0, 0), -1);
+            }
 
             // Display the frame with landmarks
-            cv::imshow("face", face);
-            cv::imshow("face_2", face_2);
+            cv::imshow("Mean Filter", face);
+            cv::imshow("No Filter", face_2);
+            cv::imshow("Kalman Filter", face_3);
 
             char key = cv::waitKey(1);
             if (key == 'q') {
@@ -273,5 +218,6 @@ int main(int argc, char** argv) {
     } catch(std::exception& e) {
         std::cout << e.what() << std::endl;
     }
+
     return 0;
 }

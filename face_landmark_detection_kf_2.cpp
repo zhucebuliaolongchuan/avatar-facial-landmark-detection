@@ -1,7 +1,6 @@
 /* 
-landmarks in images read from a webcam and draw points.
+landmarks in images read from a webcam and points that drew by the program.
  */
-
 #include <dlib/opencv.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
@@ -22,84 +21,7 @@ void print_usage() {
     std::cout << "./face_landmark_detection [path/to/shape_predictor_68_face_landmarks.dat]" << std::endl;
 }
 
-// cv::Point2i kalman_setup(cv::Point lastPoint, cv::Point curPoint) {
-// 	// 1. Kalman Setup
-// 	const int stateNum = 4;
-// 	const int measureNum = 2;
-
-// 	KalmanFilter KF(stateNum, measureNum, 0);
-// 	Mat state(stateNum, 1, CV_32FC1);
-// 	Mat processNoise(stateNum, 1, CV_32F);
-// 	Mat measurement = Mat::zeros(measureNum, 1, CV_32F);
-
-// 	// Generate a matrix randomly
-// 	randn(state, Scalar::all(0), Scalar::all(0.1));
-// 	KF.transitionMatrix = *(Mat_<float>(4, 4) <<   
-// 			1,0,1,0,
-// 			0,1,0,1,   
-//  	        0,0,1,0,   
-// 			0,0,0,1 );  
-// 	//!< measurement matrix (H) 观测模型  
-// 	setIdentity(KF.measurementMatrix);  
-  
-// 	//!< process noise covariance matrix (Q)  
-// 	setIdentity(KF.processNoiseCov, Scalar::all(1e-5));  
-          
-// 	//!< measurement noise covariance matrix (R)  
-// 	setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
-
-// 	//!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
-// 	setIdentity(KF.errorCovPost, Scalar::all(1));
-	
-// 	randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
-
-//     for (;;) {
-//         // Kalman Prediction
-//         Mat prediction = KF.predict();
-//         cv::Point2i predict_point = cv::Point2i((int)prediction.at<float>(0), (int)prediction.at<float>(1));
-
-//         // Update Measurement
-//         measurement.at<float>(0) = (float)curPoint.x;
-//         measurement.at<float>(0) = (float)curPoint.y;
-
-//         // Correct Measurement
-//         KF.correct(measurement);
-//     }
-// }
-
-void kalman_filter_setup() {
-        // Kalman Filter Setup (One Pont Test)
-        const int stateNum = 4;
-        const int measureNum = 2;
-
-        KalmanFilter KF(stateNum, measureNum, 0);
-        Mat state(stateNum, 1, CV_32FC1);
-        Mat processNoise(stateNum, 1, CV_32F);
-        Mat measurement = Mat::zeros(measureNum, 1, CV_32F);
-
-        // Generate a matrix randomly
-        randn(state, Scalar::all(0), Scalar::all(0.1));
-        KF.transitionMatrix = *(Mat_<float>(4, 4) <<   
-                                1,0,1,0,
-                                0,1,0,1,   
-                                0,0,1,0,   
-                                0,0,0,1 );
-
-        //!< measurement matrix (H) 观测模型  
-        setIdentity(KF.measurementMatrix);  
-  
-        //!< process noise covariance matrix (Q)  
-        setIdentity(KF.processNoiseCov, Scalar::all(1e-5));  
-          
-        //!< measurement noise covariance matrix (R)  
-        setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
-
-        //!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
-        setIdentity(KF.errorCovPost, Scalar::all(1));
-    
-        randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
-}
-
+// example usage for the 2-points kalman filter
 int main(int argc, char** argv) {
     try {
         if (argc > 2) {
@@ -132,14 +54,9 @@ int main(int argc, char** argv) {
 
         double scaling = 0.5;
         int flag = -1;
-        // cv::Point2f curPoint(0.0, 0.0);
         cv::Point2f first_point(0.0, 0.0);
         cv::Point2f second_point(0.0, 0.0);
 
-        // kalman_filter_setup();
-
-        // Kalman Filter Setup (One Pont Test)
-        // Kalman Filter (Second Point Test)
         const int stateNum = 8;
         const int measureNum = 4;
 
@@ -160,7 +77,7 @@ int main(int argc, char** argv) {
                                 0,0,0,0,0,0,1,0,
                                 0,0,0,0,0,0,0,1);
 
-        //!< measurement matrix (H) 观测模型  
+        //!< measurement matrix (H) Measurement Model
         setIdentity(KF.measurementMatrix);
   
         //!< process noise covariance matrix (Q)  
@@ -169,7 +86,7 @@ int main(int argc, char** argv) {
         //!< measurement noise covariance matrix (R)  
         setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
 
-        //!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
+        //!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A represents F: transitionMatrix  
         setIdentity(KF.errorCovPost, Scalar::all(1));
     
         randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
@@ -246,6 +163,7 @@ int main(int argc, char** argv) {
 
             // One Point Kalman Filter
             cv::Point2f statePt = cv::Point2f(KF.statePost.at<float>(0), KF.statePost.at<float>(1));
+
             // Kalman Prediction
             Mat prediction = KF.predict();
             cv::Point2f predict_first_point = cv::Point2f(prediction.at<float>(0), prediction.at<float>(1));
@@ -262,16 +180,11 @@ int main(int argc, char** argv) {
             // Correct Measurement
             KF.correct(measurement);
 
-            //randn(processNoise, Scalar(0), Scalar::all(sqrt(KF.processNoiseCov.at<float>(0, 0))));
-            //state = KF.transitionMatrix*state + processNoise;
-
             // Show the one-point kalman filter
             cv::circle(face, predict_first_point, 2, cv::Scalar(255, 0, 0), -1);
             cv::circle(face, predict_second_point, 2, cv::Scalar(255, 0, 0), -1);
             cv::circle(face_2, predict_first_point, 2, cv::Scalar(255, 0, 0), -1);
             cv::circle(face_2, predict_second_point, 2, cv::Scalar(255, 0, 0), -1);
-            //std::cout << predict_point << std::endl;
-
 
             // Display the frame with landmarks
             cv::imshow("face", face);
@@ -287,5 +200,6 @@ int main(int argc, char** argv) {
     } catch(std::exception& e) {
         std::cout << e.what() << std::endl;
     }
+
     return 0;
 }

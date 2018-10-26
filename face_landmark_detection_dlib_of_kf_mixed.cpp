@@ -1,5 +1,5 @@
  /*
-landmarks in images read from a webcam and draw points.
+landmarks in images read from a webcam and points that drew by the program.
  */
 #include <dlib/opencv.h>
 #include <opencv2/highgui/highgui.hpp>
@@ -21,6 +21,27 @@ void print_usage() {
     std::cout << "./face_landmark_detection [path/to/shape_predictor_68_face_landmarks.dat]" << std::endl;
 }
 
+// calculate the variance between the current points and last points
+double cal_dist_diff(std::vector<cv::Point2f> curPoints, std::vector<cv::Point2f> lastPoints) {
+    double variance = 0.0;
+    double sum = 0.0;
+    std::vector<double> diffs;
+    if (curPoints.size() == lastPoints.size()) {
+        for (int i = 0; i < curPoints.size(); i++) {
+            double diff = std::sqrt(std::pow(curPoints[i].x - lastPoints[i].x, 2.0) + std::pow(curPoints[i].y - lastPoints[i].y, 2.0));
+            sum += diff;
+            diffs.push_back(diff);
+        }
+        double mean = sum / diffs.size();
+        for (int i = 0; i < curPoints.size(); i++) {
+            variance += std::pow(diffs[i] - mean, 2);
+        }
+        return variance / diffs.size();
+    }
+    return variance;
+}
+
+// Shows the results that combined with Optical Flow, Kalman Filter and Dlib based on the speed of face movement
 int main(int argc, char** argv) {
     try {
         if (argc > 2) {
@@ -56,6 +77,8 @@ int main(int argc, char** argv) {
         double scaling = 0.5;
         int flag = -1;
         int count = 0;
+        bool redetected = true;
+        // std::vector<dlib::rectangle> faces;
 
         // Initialize measurement points
         std::vector<cv::Point2f> kalman_points;
@@ -82,10 +105,10 @@ int main(int argc, char** argv) {
         randn(state, Scalar::all(0), Scalar::all(0.0));
 
         // Generate the Measurement Matrix
-        KF.transitionMatrix = Mat::zeros(272, 272, CV_32F);
-        for (int i = 0; i < 272; i++) {
-            for (int j = 0; j < 272; j++) {
-                if (i == j || (j - 136) == i) {
+        KF.transitionMatrix = Mat::zeros(stateNum, stateNum, CV_32F);
+        for (int i = 0; i < stateNum; i++) {
+            for (int j = 0; j < stateNum; j++) {
+                if (i == j || (j - measureNum) == i) {
                     KF.transitionMatrix.at<float>(i, j) = 1.0;
                 } else {
                     KF.transitionMatrix.at<float>(i, j) = 0.0;
@@ -93,7 +116,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        //!< measurement matrix (H) 观测模型  
+        //!< measurement matrix (H) Measurement Model  
         setIdentity(KF.measurementMatrix);
   
         //!< process noise covariance matrix (Q)  
@@ -105,15 +128,14 @@ int main(int argc, char** argv) {
         //!< priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q)*/  A代表F: transitionMatrix  
         setIdentity(KF.errorCovPost, Scalar::all(1));
     
-        randn(KF.statePost, Scalar::all(0), Scalar::all(0.1));
+        randn(KF.statePost, Scalar::all(0), Scalar::all(0.0));
 
+        // Initialize Optical Flow
         cv::Mat prevgray, gray;
-
         std::vector<cv::Point2f> prevTrackPts;
         std::vector<cv::Point2f> nextTrackPts;
         for (int i = 0; i < 68; i++) {
             prevTrackPts.push_back(cv::Point2f(0, 0));
-            // nextTrackPts.push_back(cv::Point2f(0, 0));
         }
 
         // Grab and process frames until the main window is closed by the user.
@@ -139,6 +161,9 @@ int main(int argc, char** argv) {
             cv_image<bgr_pixel> cimg(temp);
 
             // Detect faces, load the vertexes as vector 
+            // if (redetected == true || faces.size() == 0) {
+            //     faces = detector(cimg);
+            // }
             std::vector<dlib::rectangle> faces = detector(cimg);
 
             // Find the pose of each face.
@@ -149,68 +174,25 @@ int main(int argc, char** argv) {
 
             // We cannot modify temp so we clone a new one
             cv::Mat face = temp.clone();
-            // We strict to detecting one face
             cv::Mat face_2 = temp.clone();
             cv::Mat face_3 = temp.clone();
             cv::Mat frame = temp.clone();
+            cv::Mat face_5 = temp.clone();
 
-            if (count == 10) {
-                if (shapes.size() == 1) {
-                    const full_object_detection& d = shapes[0];
-                    for (int i = 0; i < d.num_parts(); i++) {
-                        prevTrackPts[i].x = d.part(i).x();
-                        prevTrackPts[i].y = d.part(i).y();
-                    }
-                }
-                count = 0;
-            } else {
-                count += 1;
-            }
-
-            // Optical Flow Detection
-            cvtColor(frame, gray, CV_BGR2GRAY);
-            if (prevgray.data && !prevTrackPts.empty()) {
-                std::vector<uchar> status;
-                std::vector<float> err;
-                calcOpticalFlowPyrLK(prevgray, gray, prevTrackPts, nextTrackPts, status, err);
-                // cvtColor(prevgray, cflow, CV_GRAY2RGB);
-                for (int i = 0; i < prevTrackPts.size(); i++) {
-                    cv::circle(frame, prevTrackPts[i], 2, cv::Scalar(0, 0, 255), -1);
-                }
-            }
-            std::swap(prevTrackPts, nextTrackPts);
-            std::swap(prevgray, gray);
-
-            cv::imshow("OpticalFlow", frame);
-
-            // Simple Filter
-            if (shapes.size() == 1) {
-                const full_object_detection& d = shapes[0];
-                if (flag == -1) {
-                    for (int i = 0; i < d.num_parts(); i++) {
-                        cv::circle(face, cv::Point(d.part(i).x(), d.part(i).y()), 2, cv::Scalar(0, 0, 255), -1);
-                        std::cout << i << ": " << d.part(i) << std::endl;
-                    }
-                    flag = 1;
-                } else {
-                     for (int i = 0; i < d.num_parts(); i++) {
-                        cv::circle(face, cv::Point2f(d.part(i).x() * 0.5 + last_object[i].x * 0.5, d.part(i).y() * 0.5 + last_object[i].y * 0.5), 2, cv::Scalar(0, 0, 255), -1);
-                        std::cout << i << ": " << d.part(i) << std::endl;
-                    }
-                }
-                for (int i = 0; i < d.num_parts(); i++) {
-                    last_object[i].x = d.part(i).x();
-                    last_object[i].y = d.part(i).y();
-                }
-            }
-
-            // No Filter
-            if (shapes.size() == 1) {
+            // This function is to combine the optical flow + kalman filter + dlib to deteck and track the facial landmark
+            if (flag == -1) {
+                cvtColor(frame, prevgray, CV_BGR2GRAY);
                 const full_object_detection& d = shapes[0];
                 for (int i = 0; i < d.num_parts(); i++) {
-                    cv::circle(face_2, cv::Point2f(int(d.part(i).x()), int(d.part(i).y())), 2, cv::Scalar(0, 255, 255), -1);
-                    std::cout << i << ": " << d.part(i) << std::endl;
+                    prevTrackPts[i].x = d.part(i).x();
+                    prevTrackPts[i].y = d.part(i).y();
                 }
+                flag = 1; 
+            }
+
+            // Update Kalman Filter Points
+            if (shapes.size() == 1) {
+                const full_object_detection& d = shapes[0];
                 for (int i = 0; i < d.num_parts(); i++) {
                     kalman_points[i].x = d.part(i).x();
                     kalman_points[i].y = d.part(i).y();
@@ -218,12 +200,57 @@ int main(int argc, char** argv) {
             }
 
             // Kalman Prediction
-            // cv::Point2f statePt = cv::Point2f(KF.statePost.at<float>(0), KF.statePost.at<float>(1));
             Mat prediction = KF.predict();
             // std::vector<cv::Point2f> predict_points;
             for (int i = 0; i < 68; i++) {
                 predict_points[i].x = prediction.at<float>(i * 2);
                 predict_points[i].y = prediction.at<float>(i * 2 + 1);
+            }
+
+            // Optical Flow + Kalman Filter + Dlib based on the speed of face movement
+            if (shapes.size() == 1) {
+                cvtColor(frame, gray, CV_BGR2GRAY);
+                if (prevgray.data) {
+                    std::vector<uchar> status;
+                    std::vector<float> err;
+                    calcOpticalFlowPyrLK(prevgray, gray, prevTrackPts, nextTrackPts, status, err);
+                    std::cout << "variance:" <<cal_dist_diff(prevTrackPts, nextTrackPts) << std::endl;
+
+                    double diff = cal_dist_diff(prevTrackPts, nextTrackPts);
+                    if (diff > 1.0) { // the threshold value here depends on the system, camera specs, etc
+                         // if the face is moving so fast, use dlib to detect the face
+                        const full_object_detection& d = shapes[0];
+                        std::cout<< "DLIB" << std::endl;
+                        for (int i = 0; i < d.num_parts(); i++) {
+                            cv::circle(face_5, cv::Point2f(d.part(i).x(), d.part(i).y()), 2, cv::Scalar(0, 0, 255), -1);
+                            nextTrackPts[i].x = d.part(i).x();
+                            nextTrackPts[i].y = d.part(i).y();
+                        }
+                    } else if (diff <= 1.0 && diff > 0.005){
+                        // In this case, use Optical Flow
+                        std::cout<< "Optical Flow" << std::endl;
+                        for (int i = 0; i < nextTrackPts.size(); i++) {
+                            cv::circle(face_5, nextTrackPts[i], 2, cv::Scalar(255, 0, 0), -1);
+                        }
+                    } else {
+                        // In this case, use Kalman Filter
+                        std::cout<< "Kalman Filter" << std::endl;
+                        for (int i = 0; i < predict_points.size(); i++) {
+                            cv::circle(face_5, predict_points[i], 2, cv::Scalar(0, 255, 0), -1);
+                            nextTrackPts[i].x = predict_points[i].x;
+                            nextTrackPts[i].y = predict_points[i].y;
+                        }
+                        redetected = false;
+                    }
+                } else {
+                    redetected = true;
+                }
+
+                // previous points should be updated with the current points
+                std::swap(prevTrackPts, nextTrackPts);
+                std::swap(prevgray, gray);
+            } else {
+                redetected = true;
             }
 
             // Update Measurement
@@ -235,20 +262,11 @@ int main(int argc, char** argv) {
                 }
             }
 
+            // Update the Measurement Matrix
             measurement += KF.measurementMatrix * state;
-
-            // Correct Measurement
             KF.correct(measurement);
 
-            // Show 68-points utilizing kalman filter
-            for (int i = 0; i < 68; i++) {
-                cv::circle(face_3, predict_points[i], 2, cv::Scalar(255, 0, 0), -1);
-            }
-
-            // Display the frame with landmarks
-            cv::imshow("Mean Filter", face);
-            cv::imshow("No Filter", face_2);
-            cv::imshow("Kalman Filter", face_3);
+            cv::imshow("KF+OF+DLIB", face_5);
 
             char key = cv::waitKey(1);
             if (key == 'q') {
